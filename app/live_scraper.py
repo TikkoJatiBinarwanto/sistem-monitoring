@@ -66,7 +66,37 @@ def load_ml_models():
         )
 
     lda_path  = os.path.join(model_dir, gensim_files[-1])
-    lda_model = LdaModel.load(lda_path)
+
+    # Custom unpickler: redirect numpy 2.x random module paths -> numpy 1.x
+    # Model saved with numpy 2.x references numpy.random._mt19937.MT19937
+    # which doesn't exist in numpy 1.x (MT19937 lives in numpy.random._common)
+    import sys, pickle
+    import numpy.random._common as _np_common
+
+    class _NumpyCompatUnpickler(pickle.Unpickler):
+        _MODULE_MAP = {
+            "numpy.random._mt19937":     _np_common,
+            "numpy.random._pcg64":      _np_common,
+            "numpy.random._sfc64":      _np_common,
+            "numpy.random._philox":     _np_common,
+            "numpy.random._generator":  _np_common,
+        }
+        def find_class(self, module, name):
+            if module in self._MODULE_MAP:
+                mod = self._MODULE_MAP[module]
+                return getattr(mod, name, None) or super().find_class(module, name)
+            return super().find_class(module, name)
+
+    _orig_unpickle = gensim.utils.unpickle
+    def _patched_unpickle(fname, *args, **kwargs):
+        with open(fname, "rb") as f:
+            obj = _NumpyCompatUnpickler(f, encoding="latin1").load()
+        return obj
+    gensim.utils.unpickle = _patched_unpickle
+    try:
+        lda_model = LdaModel.load(lda_path)
+    finally:
+        gensim.utils.unpickle = _orig_unpickle
 
     # Gunakan Dictionary yang sudah tertanam di dalam model (WAJIB untuk konsistensi word ID)
     vectorizer = lda_model.id2word
