@@ -50,6 +50,7 @@ def load_ml_models():
     Memuat model LDA terbaru (format Gensim native .gensim) dan topic_labels.json.
     Dictionary langsung diambil dari model untuk menjamin konsistensi word ID.
     """
+    import gensim.utils
     from gensim.models import LdaModel
 
     root      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
