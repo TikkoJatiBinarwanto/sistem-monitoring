@@ -1,0 +1,9 @@
+gensim==4.4.0
+google-play-scraper==1.2.7
+matplotlib==3.11.1
+numpy==2.5.1
+pandas==3.0.3
+plotly==6.9.0
+streamlit==1.58.0
+wordcloud==1.9.6
+indoNLP==0.3.4

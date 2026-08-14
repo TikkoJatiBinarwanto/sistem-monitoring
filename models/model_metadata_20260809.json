@@ -1,0 +1,30 @@
+{
+  "version": "v1_20260809",
+  "created_at": "2026-08-09T16:40:08.667712",
+  "corpus_size": 9874,
+  "vocabulary_size": 5548,
+  "num_topics": 12,
+  "alpha": "asymmetric",
+  "decay": 0.5,
+  "coherence_cv": 0.4132,
+  "topic_labels": {
+    "0": "Kemudahan Penggunaan dan Manfaat untuk Pembelajaran",
+    "1": "Kualitas Hasil, Pembaruan, dan Kendala Login",
+    "2": "Fitur AI, Video, dan Layanan Gratis",
+    "3": "Biaya Langganan dan Masalah Teknis",
+    "4": "Apresiasi terhadap Kualitas Layanan AI",
+    "5": "Fitur Gambar, Foto, dan Pengeditan Visual",
+    "6": "Pengalaman Percakapan dengan AI",
+    "7": "Interaksi Kasual dan Perbandingan Aplikasi AI",
+    "8": "Proses, Limit, dan Pengalaman Penggunaan Fitur Visual",
+    "9": "Interaksi Personal, Akurasi, dan Layanan Premium",
+    "10": "Pembayaran, Versi Pro, dan Pembatasan Konten",
+    "11": "Pengelolaan Data dan Kendala Penggunaan Aplikasi"
+  },
+  "artifacts": {
+    "lda_model": "/content/drive/MyDrive/ProjekTiko/notebook/models/lda_model_v1_20260809.gensim",
+    "dictionary": "/content/drive/MyDrive/ProjekTiko/notebook/models/vectorizer_v1_20260809.pkl",
+    "labels": "/content/drive/MyDrive/ProjekTiko/notebook/models/topic_labels_test.json",
+    "final_csv": "/content/drive/MyDrive/ProjekTiko/test/data/final/final_topic_data.csv"
+  }
+}

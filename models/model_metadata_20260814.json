@@ -1,0 +1,22 @@
+{
+  "version": "v1_20260814",
+  "created_at": "2026-08-14T10:10:47.294492",
+  "corpus_size": 10000,
+  "vocabulary_size": 7533,
+  "num_topics": 4,
+  "alpha": "0.1",
+  "decay": 0.5,
+  "coherence_cv": 0.6105,
+  "topic_labels": {
+    "0": "Kendala Akses dan Penggunaan Aplikasi",
+    "1": "Kepuasan dan Manfaat Aplikasi",
+    "2": "Fitur dan Kinerja Respons AI.",
+    "3": "Perbandingan dan Pengalaman Penggunaan AI"
+  },
+  "artifacts": {
+    "lda_model": "/content/drive/MyDrive/ProjekTiko/notebook_K4_Tokenisasi/models/lda_model_v1_20260814.gensim",
+    "dictionary": "/content/drive/MyDrive/ProjekTiko/notebook_K4_Tokenisasi/models/vectorizer_v1_20260814.pkl",
+    "labels": "/content/drive/MyDrive/ProjekTiko/notebook_K4_Tokenisasi/models/topic_labels.json",
+    "final_csv": "/content/drive/MyDrive/ProjekTiko/notebook_K4_Tokenisasi/data/final/final_topic_data.csv"
+  }
+}

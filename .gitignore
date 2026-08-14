@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit secrets
+.secrets
+
+# Data — tidak perlu di-deploy
+data/temp/
+data/final/
+data/raw/
+data/processed/
+
+# Notebooks & docs terlalu besar
+notebook_K4_Tokenisasi/
+notebooks_lama/
+Penulisan/
+docs/logs/
+
+# Archive files
+*.rar
+*.zip
+*.tar.gz
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Temp files
+.tmp.drivedownload/
+.tmp.driveupload/
+transitions_check.txt
