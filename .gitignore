@@ -50,3 +50,5 @@ docs/logs/
 .tmp.drivedownload/
 .tmp.driveupload/
 transitions_check.txt
+.hermes/
+.hermes-tmp*
