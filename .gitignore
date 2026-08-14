@@ -53,3 +53,5 @@ docs/logs/
 transitions_check.txt
 .hermes/
 .hermes-tmp*
+app/bottom.py
+app_lama/
