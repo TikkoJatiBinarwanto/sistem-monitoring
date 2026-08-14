@@ -69,12 +69,14 @@ def load_ml_models():
     lda_path  = os.path.join(model_dir, gensim_files[-1])
 
     # ── Numpy 2.x → 1.x compat ──────────────────────────────────────────────
-    # Model saved with numpy 2.x references numpy.random._mt19937.MT19937
-    # which doesn't exist in numpy 1.x.  Fix: register fake modules so pickle
-    # can import them, AND monkey-patch __bit_generator_ctor which receives the
-    # full dotted path string as argument (numpy 2.x pickle protocol change).
+    # Model saved with numpy 2.x has pickle GLOBAL opcodes for
+    # numpy.random._mt19937.MT19937 etc. which don't exist in numpy 1.x.
+    # Fix: monkey-patch the module-level __bit_generator_ctor so that when
+    # pickle resolves the GLOBAL and calls it with a CLASS object (not str),
+    # the class is correctly identified.
     import sys
     import types
+    import pickle as _pickle_mod
     import numpy.random._pickle as _nrp
     import numpy.random._common as _np_common
 
@@ -92,20 +94,43 @@ def load_ml_models():
             _fake.PCG64DXSM    = getattr(_np_common, "PCG64DXSM", _np_common.PCG64)
             _fake.SFC64        = _np_common.SFC64
             _fake.Philox       = getattr(_np_common, "Philox", _np_common.MT19937)
-            _fake.__bit_generator_ctor = _nrp.__bit_generator_ctor
+            # Patch __bit_generator_ctor on the fake module so pickle resolves
+            # the GLOBAL opcode to THIS patched version (module-level lookup)
+            _orig_local = _nrp.__bit_generator_ctor
+            def _make_ctor(orig=_orig_local):
+                def ctor(bit_generator="MT19937"):
+                    if isinstance(bit_generator, type):
+                        bit_generator = bit_generator.__name__
+                    elif isinstance(bit_generator, str) and "." in bit_generator:
+                        bit_generator = bit_generator.rsplit(".", 1)[-1]
+                    return orig(bit_generator)
+                return ctor
+            _fake.__bit_generator_ctor = _make_ctor()
             sys.modules[_mod_name] = _fake
             _saved_modules[_mod_name] = _fake
 
+    # Also patch the canonical module-level ctor (some pickle paths use it directly)
     _orig_ctor = _nrp.__bit_generator_ctor
     def _patched_ctor(bit_generator="MT19937"):
-        if isinstance(bit_generator, str) and "." in bit_generator:
+        if isinstance(bit_generator, type):
+            bit_generator = bit_generator.__name__
+        elif isinstance(bit_generator, str) and "." in bit_generator:
             bit_generator = bit_generator.rsplit(".", 1)[-1]
         return _orig_ctor(bit_generator)
     _nrp.__bit_generator_ctor = _patched_ctor
 
+    # Force pure Python pickle so find_class override is honored
+    import gensim.utils as _gu
+    _orig_unpickle = _gu.unpickle
+    def _pure_unpickle(fname, *args, **kwargs):
+        with open(fname, "rb") as f:
+            return _pickle_mod.Unpickler(f, encoding="latin1").load()
+    _gu.unpickle = _pure_unpickle
+
     try:
         lda_model = LdaModel.load(lda_path)
     finally:
+        _gu.unpickle = _orig_unpickle
         _nrp.__bit_generator_ctor = _orig_ctor
         for _mod_name in _saved_modules:
             sys.modules.pop(_mod_name, None)
