@@ -68,36 +68,47 @@ def load_ml_models():
 
     lda_path  = os.path.join(model_dir, gensim_files[-1])
 
-    # Custom unpickler: redirect numpy 2.x random module paths -> numpy 1.x
+    # ── Numpy 2.x → 1.x compat ──────────────────────────────────────────────
     # Model saved with numpy 2.x references numpy.random._mt19937.MT19937
-    # which doesn't exist in numpy 1.x (MT19937 lives in numpy.random._common)
-    import sys, pickle
+    # which doesn't exist in numpy 1.x.  Fix: register fake modules so pickle
+    # can import them, AND monkey-patch __bit_generator_ctor which receives the
+    # full dotted path string as argument (numpy 2.x pickle protocol change).
+    import sys
+    import types
+    import numpy.random._pickle as _nrp
     import numpy.random._common as _np_common
 
-    class _NumpyCompatUnpickler(pickle.Unpickler):
-        _MODULE_MAP = {
-            "numpy.random._mt19937":     _np_common,
-            "numpy.random._pcg64":      _np_common,
-            "numpy.random._sfc64":      _np_common,
-            "numpy.random._philox":     _np_common,
-            "numpy.random._generator":  _np_common,
-        }
-        def find_class(self, module, name):
-            if module in self._MODULE_MAP:
-                mod = self._MODULE_MAP[module]
-                return getattr(mod, name, None) or super().find_class(module, name)
-            return super().find_class(module, name)
+    _FAKE_MODULES = [
+        "numpy.random._mt19937", "numpy.random._pcg64",
+        "numpy.random._sfc64",   "numpy.random._philox",
+        "numpy.random._generator",
+    ]
+    _saved_modules = {}
+    for _mod_name in _FAKE_MODULES:
+        if _mod_name not in sys.modules:
+            _fake = types.ModuleType(_mod_name)
+            _fake.MT19937      = _np_common.MT19937
+            _fake.PCG64        = _np_common.PCG64
+            _fake.PCG64DXSM    = getattr(_np_common, "PCG64DXSM", _np_common.PCG64)
+            _fake.SFC64        = _np_common.SFC64
+            _fake.Philox       = getattr(_np_common, "Philox", _np_common.MT19937)
+            _fake.__bit_generator_ctor = _nrp.__bit_generator_ctor
+            sys.modules[_mod_name] = _fake
+            _saved_modules[_mod_name] = _fake
 
-    _orig_unpickle = gensim.utils.unpickle
-    def _patched_unpickle(fname, *args, **kwargs):
-        with open(fname, "rb") as f:
-            obj = _NumpyCompatUnpickler(f, encoding="latin1").load()
-        return obj
-    gensim.utils.unpickle = _patched_unpickle
+    _orig_ctor = _nrp.__bit_generator_ctor
+    def _patched_ctor(bit_generator="MT19937"):
+        if isinstance(bit_generator, str) and "." in bit_generator:
+            bit_generator = bit_generator.rsplit(".", 1)[-1]
+        return _orig_ctor(bit_generator)
+    _nrp.__bit_generator_ctor = _patched_ctor
+
     try:
         lda_model = LdaModel.load(lda_path)
     finally:
-        gensim.utils.unpickle = _orig_unpickle
+        _nrp.__bit_generator_ctor = _orig_ctor
+        for _mod_name in _saved_modules:
+            sys.modules.pop(_mod_name, None)
 
     # Gunakan Dictionary yang sudah tertanam di dalam model (WAJIB untuk konsistensi word ID)
     vectorizer = lda_model.id2word
