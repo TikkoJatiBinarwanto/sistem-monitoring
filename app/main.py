@@ -1,7 +1,13 @@
 """main.py — Entry point Dashboard Monitoring (Streamlit) — Versi UI/UX Premium."""
 import os
+import sys
 import streamlit as st
 import pandas as pd
+
+# Pastikan direktori app/ ada di sys.path (aman untuk streamlit_app.py dan app/main.py)
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
 
 # ── Konfigurasi Halaman (HARUS di baris pertama) ──────────────────────────────
 st.set_page_config(
