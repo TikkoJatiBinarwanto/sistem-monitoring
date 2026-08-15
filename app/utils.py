@@ -5,7 +5,6 @@ import pandas as pd
 import streamlit as st
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMP_DIR    = os.path.join(ROOT, "data", "temp")
 LABELS_JSON = os.path.join(ROOT, "models", "topic_labels.json")
 
 # ── Mapping app_source -> nama display yang ramah ─────────────────────────────
@@ -25,60 +24,6 @@ _APP_DISPLAY = {
 # LOAD FUNCTIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=60)
-def get_available_apps() -> dict:
-    """
-    Mendeteksi aplikasi dari data/temp/ (live scraper).
-    Setiap file topic_data_{app_id}.csv merepresentasikan satu aplikasi.
-    Returns: dict {app_id: display_name}
-    """
-    apps = {}
-
-    if not os.path.exists(TEMP_DIR):
-        return apps
-
-    for filename in os.listdir(TEMP_DIR):
-        if not filename.startswith("topic_data_") or not filename.endswith(".csv"):
-            continue
-        app_id = filename.replace("topic_data_", "").replace(".csv", "")
-        try:
-            df_check = pd.read_csv(os.path.join(TEMP_DIR, filename), nrows=1)
-            if "app_source" in df_check.columns:
-                src = str(df_check["app_source"].iloc[0]).strip().lower()
-                display = _APP_DISPLAY.get(src, src.title())
-            else:
-                display = app_id.title()
-            apps[app_id] = display
-        except Exception:
-            apps[app_id] = app_id.title()
-
-    return apps
-
-
-@st.cache_data(ttl=60)
-def load_data(app_id: str) -> pd.DataFrame:
-    """
-    Memuat data dari data/temp/topic_data_{app_id}.csv.
-    Hanya membaca dari folder temp — data final notebook tidak digunakan.
-    """
-    if not app_id:
-        return pd.DataFrame()
-
-    # Hapus prefix __final__ jika ada (backward compat)
-    if app_id.startswith("__final__"):
-        app_id = app_id.replace("__final__", "")
-
-    path = os.path.join(TEMP_DIR, f"topic_data_{app_id}.csv")
-    if os.path.exists(path):
-        try:
-            return pd.read_csv(path, parse_dates=["date"])
-        except Exception as e:
-            st.error(f"Gagal memuat {path}: {e}")
-
-    return pd.DataFrame()
-
-
-@st.cache_data
 def load_topic_labels() -> dict:
     """Memuat mapping ID topik ke label semantik dari topic_labels.json."""
     if not os.path.exists(LABELS_JSON):

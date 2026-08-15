@@ -29,7 +29,6 @@ load_css()
 # ── Import Modul Lokal ────────────────────────────────────────────────────────
 from utils import (
     load_topic_labels, filter_by_window, calculate_growth_rate,
-    load_data, get_available_apps, TEMP_DIR,
 )
 from components.charts import (
     plot_trend_line, plot_topic_distribution,
@@ -45,24 +44,26 @@ if "selected_app_id" not in st.session_state:
     st.session_state.selected_app_id = None
 if "_just_reset" not in st.session_state:
     st.session_state._just_reset = False
+# Dataset per-session: data hanya hidup di session ini, hilang saat refresh.
+if "df_data" not in st.session_state:
+    st.session_state.df_data = pd.DataFrame()
+if "df_data_app_id" not in st.session_state:
+    st.session_state.df_data_app_id = None
+if "df_data_app_name" not in st.session_state:
+    st.session_state.df_data_app_name = None
 
-# ── Temp Directory & Helpers ──────────────────────────────────────────────────
-os.makedirs(TEMP_DIR, exist_ok=True)
-
-def save_to_temp_csv(df_new: pd.DataFrame, app_id: str) -> int:
-    path = os.path.join(TEMP_DIR, f"topic_data_{app_id}.csv")
+# ── Helper: simpan dataset ke session (bukan file) ───────────────────────────
+def save_df_to_session(df_new: pd.DataFrame, app_id: str, app_name: str) -> int:
+    """Simpan DataFrame ke session state. Overwrite total (reset on new fetch)."""
     base_cols = ["date", "text", "text_clean", "rating", "topic_label", "topic_probability",
                  "app_source", "dominant_topic"]
     extra_cols = [c for c in df_new.columns if c.startswith("prob_")]
     all_cols   = base_cols + extra_cols
-    df_new = df_new[[c for c in all_cols if c in df_new.columns]]
-    try:
-        # Overwrite completely (reset dataset on new fetch)
-        df_new.to_csv(path, index=False)
-        return len(df_new)
-    except Exception as e:
-        st.error(f"Gagal menyimpan ke CSV sementara: {e}")
-        return 0
+    df_clean   = df_new[[c for c in all_cols if c in df_new.columns]].copy()
+    st.session_state.df_data       = df_clean
+    st.session_state.df_data_app_id   = app_id
+    st.session_state.df_data_app_name = app_name
+    return len(df_clean)
 
 # ── Load Label Topik ──────────────────────────────────────────────────────────
 try:
@@ -98,14 +99,14 @@ with st.sidebar:
                 with st.spinner("Sedang memproses... (Normalisasi & Inferensi Topik)"):
                     df_new = fetch_and_process_reviews(scraper_app_id, app_options[scraper_app_id], limit_choice)
                     if not df_new.empty:
-                        added = save_to_temp_csv(df_new, scraper_app_id)
+                        added = save_df_to_session(df_new, scraper_app_id, app_options[scraper_app_id])
                         st.session_state.selected_app_id = scraper_app_id
                         st.cache_data.clear()
                         notif_placeholder = st.empty()
                         if added > 0:
-                            notif_placeholder.success(f"✅ {added} ulasan unik ditambahkan ke dataset.")
+                            notif_placeholder.success(f"✅ {added} ulasan dimuat ke dataset sesi ini.")
                         else:
-                            notif_placeholder.warning("Semua ulasan sudah ada di dataset.")
+                            notif_placeholder.warning("Data kosong.")
                         import time
                         time.sleep(5)
                         notif_placeholder.empty()
@@ -138,13 +139,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FILTER BAR — get_available_apps() hanya scan data/temp/ (live scraper)
+# FILTER BAR — dataset dari session state (per-session, bukan file)
 # ─────────────────────────────────────────────────────────────────────────────
-avail_apps = get_available_apps()
+df_session = st.session_state.df_data
+session_app_id   = st.session_state.df_data_app_id
+session_app_name = st.session_state.df_data_app_name
 
-# Auto-load first app hanya saat awal, bukan setelah reset
-if avail_apps and st.session_state.selected_app_id is None and not st.session_state._just_reset:
-    st.session_state.selected_app_id = list(avail_apps.keys())[0]
+# Auto-load session app hanya saat awal, bukan setelah reset
+if session_app_id and st.session_state.selected_app_id is None and not st.session_state._just_reset:
+    st.session_state.selected_app_id = session_app_id
 st.session_state._just_reset = False  # clear flag setelah dipakai
 
 selected_app_id = st.session_state.selected_app_id
@@ -154,10 +157,10 @@ with st.container():
     fc0, fc1, fc2 = st.columns([2.0, 2.5, 1.5])
 
     with fc0:
-        if selected_app_id and selected_app_id in avail_apps:
-            app_display_name = avail_apps[selected_app_id]
+        if selected_app_id and not df_session.empty:
+            app_display_name = session_app_name or selected_app_id
             st.markdown(f"📱 **Nama Aplikasi**<br><span style='font-size:1.15rem; font-weight:bold; color:#fdfdfd;'>{app_display_name}</span>", unsafe_allow_html=True)
-            df_raw = load_data(selected_app_id)
+            df_raw = df_session
         else:
             st.markdown("📱 **Nama Aplikasi**<br><span style='color:rgba(255,255,255,0.4);'>Tidak ada data</span>", unsafe_allow_html=True)
             df_raw = pd.DataFrame()
@@ -172,17 +175,9 @@ with st.container():
     with fc2:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🗑️ Reset Dataset", use_container_width=True):
-            import shutil
-            if os.path.exists(TEMP_DIR):
-                for filename in os.listdir(TEMP_DIR):
-                    file_path = os.path.join(TEMP_DIR, filename)
-                    try:
-                        if os.path.isfile(file_path) or os.path.islink(file_path):
-                            os.unlink(file_path)
-                        elif os.path.isdir(file_path):
-                            shutil.rmtree(file_path)
-                    except Exception:
-                        pass
+            st.session_state.df_data       = pd.DataFrame()
+            st.session_state.df_data_app_id   = None
+            st.session_state.df_data_app_name = None
             st.session_state.selected_app_id = None
             st.session_state._just_reset = True
             st.cache_data.clear()
