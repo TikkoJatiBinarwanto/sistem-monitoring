@@ -186,7 +186,9 @@ def plot_rating_distribution(df: pd.DataFrame):
 # ─────────────────────────────────────────────────────────────────────────────
 def plot_topic_heatmap(df: pd.DataFrame):
     """
-    Heatmap: topik (baris) × bulan (kolom), nilai = volume ulasan.
+    Heatmap: topik (baris) × periode (kolom), nilai = volume ulasan.
+    Granularity otomatis: bulan → minggu → hari, agar heatmap selalu tampil
+    meskipun rentang data pendek (mis. data 1 bulan).
     Returns: Plotly Figure | None
     """
     if df.empty or "date" not in df.columns or "topic_label" not in df.columns:
@@ -194,15 +196,20 @@ def plot_topic_heatmap(df: pd.DataFrame):
 
     df_h = df.copy()
     df_h["date"] = pd.to_datetime(df_h["date"])
-    df_h["month"] = df_h["date"].dt.to_period("M").astype(str)
 
-    pivot = (
-        df_h.groupby(["topic_label", "month"])
-        .size()
-        .unstack(fill_value=0)
-    )
+    # Coba granularity dari kasar ke halus; berhenti saat >= 2 kolom
+    pivot = None
+    for period, freq in (("bulan", "M"), ("minggu", "W"), ("hari", "D")):
+        df_h["period"] = df_h["date"].dt.to_period(freq).astype(str)
+        pivot = (
+            df_h.groupby(["topic_label", "period"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        if pivot.shape[1] >= 2 or period == "hari":
+            break
 
-    if pivot.empty or pivot.shape[1] < 2:
+    if pivot is None or pivot.empty or pivot.shape[1] < 1:
         return None
 
     fig = go.Figure(go.Heatmap(
